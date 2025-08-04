@@ -107,7 +107,7 @@ initialize Component {..} getView = do
     eventLoop !oldModel = liftIO wait >> do
       as <- liftIO $ atomicModifyIORef' componentActions $ \actions -> (S.empty, actions)
       let info = ComponentInfo componentId componentDOMRef
-      newModel <- foldEffects update Async info componentSink (toList as) oldModel
+      newModel <- foldEffects update Sync info componentSink (reverse $ toList as) oldModel
       oldName <- liftIO $ oldModel `seq` makeStableName oldModel
       newName <- liftIO $ newModel `seq` makeStableName newModel
       when (oldName /= newName && oldModel /= newModel) $ do
@@ -456,6 +456,7 @@ foldEffects _ _ _ _ [] m = pure m
 foldEffects update synchronicity info snk (e:es) o =
   case runEffect (update e) info o of
     (n, subs) -> do
+      liftIO $ putStrLn $ "Num subs: " <> show (Prelude.length subs) <> ", Num actions: " <> (show $ Prelude.length es + 1)
       forM_ subs $ \sub -> do
         syncWith synchronicity $
           sub snk `catch` (void . exception)
