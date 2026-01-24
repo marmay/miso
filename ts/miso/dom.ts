@@ -11,6 +11,7 @@ export function diff<T>(c: VTree<T>, n: VTree<T>, parent: T, context: DrawingCon
     else if (c.type === VTreeType.VComp && n.type === VTreeType.VComp) {
         if (n.key === c.key) {
           n.child = c.child;
+          n.componentId = c.componentId;
           if (c.child) c.child.parent = n;
           return;
         }
@@ -430,7 +431,7 @@ function syncChildren<T>(os: Array<VTree<T>>, ns: Array<VTree<T>>, parent: T, co
     else if (newFirstIndex > newLastIndex) {
       tmp = oldLastIndex;
       while (oldLastIndex >= oldFirstIndex) {
-        removeChild(parent, os[oldLastIndex--], context);
+        destroy(os[oldLastIndex--], parent, context);
       }
       os.splice(oldFirstIndex, tmp - oldFirstIndex + 1);
       break;

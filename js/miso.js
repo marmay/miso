@@ -11,6 +11,7 @@ function diff(c, n, parent, context) {
   } else if (c.type === 0 /* VComp */ && n.type === 0 /* VComp */) {
     if (n.key === c.key) {
       n.child = c.child;
+      n.componentId = c.componentId;
       if (c.child)
         c.child.parent = n;
       return;
@@ -330,9 +331,6 @@ function create(n, parent, context) {
 function insertBefore(parent, n, o, context) {
   context.insertBefore(parent, getDOMRef(n), o ? getDOMRef(o) : null);
 }
-function removeChild(parent, n, context) {
-  context.removeChild(parent, getDOMRef(n));
-}
 function swapDOMRef(oLast, oFirst, parent, context) {
   context.swapDOMRefs(getDOMRef(oLast), getDOMRef(oFirst), parent);
 }
@@ -354,7 +352,7 @@ function syncChildren(os, ns, parent, context) {
     } else if (newFirstIndex > newLastIndex) {
       tmp = oldLastIndex;
       while (oldLastIndex >= oldFirstIndex) {
-        removeChild(parent, os[oldLastIndex--], context);
+        destroy(os[oldLastIndex--], parent, context);
       }
       os.splice(oldFirstIndex, tmp - oldFirstIndex + 1);
       break;

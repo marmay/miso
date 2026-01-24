@@ -185,6 +185,7 @@ initialize events _componentParentId hydrate isRoot comp@Component {..} getCompo
         _timestamp :: Double <- takeMVar frame
         Diff.diff (Just oldVTree) (Just newVTree) _componentDOMRef
         liftIO (atomicWriteIORef _componentVTree newVTree)
+        FFI.updateRef oldVTree newVTree
 
   let _componentApplyActions = \actions model_ -> do
         let info = ComponentInfo _componentId _componentParentId _componentDOMRef
@@ -915,6 +916,7 @@ drain
   -> IO ()
 drain cs@ComponentState {..} = do
   drainQueueAt _componentId >>= \case
+    [] -> pure ()  -- Base case: queue empty, stop recursion
     actions -> do
        case _componentApplyActions actions _componentModel of
          (updated, schedules :: [Schedule action]) -> do
