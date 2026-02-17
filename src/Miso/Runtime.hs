@@ -250,22 +250,24 @@ scheduler =
     -- | Apply the actions across the model, evaluate async and sync IO.
     commit :: ComponentId -> [action] -> IO Bool
     commit vcompId events = do
-      ComponentState {..} <- (IM.! vcompId) <$> liftIO (readIORef components)
-      case _componentApplyActions events _componentModel of
-        (updatedModel, schedules) -> do
-          forM_ schedules $ \case
-            Schedule Async action ->
-              evalScheduled Async
-                (action _componentSink)
-            Schedule Sync action ->
-              evalScheduled Sync
-                (action _componentSink)
-          let dirty = _componentModelDirty _componentModel updatedModel
-          when dirty $ do
-            modifyComponent _componentId $ do
-              isDirty .= True
-              componentModel .= updatedModel
-          pure dirty
+      IM.lookup vcompId <$> liftIO (readIORef components) >>= \case
+        Nothing -> pure False -- component was unmounted, skip
+        Just ComponentState {..} ->
+          case _componentApplyActions events _componentModel of
+            (updatedModel, schedules) -> do
+              forM_ schedules $ \case
+                Schedule Async action ->
+                  evalScheduled Async
+                    (action _componentSink)
+                Schedule Sync action ->
+                  evalScheduled Sync
+                    (action _componentSink)
+              let dirty = _componentModelDirty _componentModel updatedModel
+              when dirty $ do
+                modifyComponent _componentId $ do
+                  isDirty .= True
+                  componentModel .= updatedModel
+              pure dirty
     -----------------------------------------------------------------------------
     -- | Perform a top-down rendering of the 'Component' tree.
     --
@@ -362,16 +364,19 @@ propagateChildren
   -> Synch p m a ()
 propagateChildren currentState childComponents = do
   forM_ childComponents $ \childId -> do
-    childState <- unsafeCoerce (IM.! childId) <$> use state
-    updatedChild <- unsafeCoerce <$>
-      foldM process childState (childState ^. componentBindings)
-    let isChildDirty =
-          (_componentModelDirty childState)
-          (_componentModel childState)
-          (_componentModel updatedChild)
-    when isChildDirty $ do
-      state.at childId ?= updatedChild { _componentIsDirty = True }
-      visit childId
+    IM.lookup childId <$> use state >>= \case
+      Nothing -> pure () -- child was unmounted, skip
+      Just cs -> do
+        let childState = unsafeCoerce cs
+        updatedChild <- unsafeCoerce <$>
+          foldM process childState (childState ^. componentBindings)
+        let isChildDirty =
+              (_componentModelDirty childState)
+              (_componentModel childState)
+              (_componentModel updatedChild)
+        when isChildDirty $ do
+          state.at childId ?= updatedChild { _componentIsDirty = True }
+          visit childId
     where
       process
         :: ComponentState m child a
